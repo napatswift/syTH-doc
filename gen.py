@@ -238,13 +238,14 @@ if __name__ == '__main__':
         )
 
         for j in range(args.copy):
-            img_path = os.path.join(img_dir, f'img_{img_counter}.jpg')
+            img_name = f'img_{img_counter}.jpg'
+            img_path = os.path.join(img_dir, img_name)
             aug_img = aug_pipeline(np.array(img))[0]
 
             cv2.imwrite(os.path.join(args.output_dir, img_path), aug_img)
 
             m = metadata.copy()
-            m['image_path'] = img_path
+            m['image_path'] = img_name
             image_bbox_list.append(m)
             img_counter += 1
 
