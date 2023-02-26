@@ -10,11 +10,15 @@ import json
 import augraphy as ag
 import numpy as np
 import cv2
+import attacut
 
 aug_pipeline = ag.AugmentationSequence([
     ag.LowInkRandomLines(),
-    ag.PencilScribbles(size_range=(10, 50), stroke_count_range=(
-        1, 3), count_range=(1, 3), thickness_range=(1, 2), p=.5),
+    ag.PencilScribbles(size_range=(10, 50),
+                       stroke_count_range=(1, 3),
+                       count_range=(1, 3),
+                       thickness_range=(1, 2),
+                       p=.5),
     ag.Gamma(gamma_range=(.1, .3)),
     ag.LowInkPeriodicLines(),
 ])
@@ -75,6 +79,14 @@ def get_token_text(token: str):
         return ''.join([arabic2th(n) if n.isdigit() else n for n in faker.phone_number()])
     if token == 'month':
         return faker.month_name()
+    if re.match(r'paragraph_\d+', token):
+        n = re.findall(r'paragraph_(\d+)', token)[0]
+        n = int(n)
+        return faker.paragraph(n)
+    if re.match(r'words_\d+', token):
+        n = re.findall(r'words_(\d+)', token)[0]
+        n = int(n)
+        return ''.join(faker.words(n))
     return 'dummy'
 
 
@@ -126,28 +138,40 @@ def generate():
     font = get_font()
     parsed_components = markdown_parser(get_doc_md(doc_template_gen.gen()))
     line_height = font.size + 6
-    position_start = {'x': 120, 'y': 150}
+    position_start = {'x': 120, 'y': 150, }
+    paper_config = {'max_x': paper.size[0] - 120}
     curr = position_start.copy()
 
     text_bbox = []
     for component in parsed_components:
         if component['type'] == 'paragraph':
             for c_comp in component['children']:
-                #canvas.text(list(curr.values()), c_comp['text'], fill='black', font=font)
-                args = {**curr, 'text': c_comp['text'],
-                        'font': font, 'canvas': canvas}
-                text_bbox.extend(put_text(**args))
-                curr['y'] += line_height
+                text = c_comp['text']
+                if curr['x'] + font.getlength(text) > paper_config['max_x']:
+                    word_list = attacut.tokenize(text)
+                    line_list = []
+                    line = ''
+                    for word in word_list:
+                        if curr['x'] + font.getlength(line+word) < paper_config['max_x']:
+                            line += word
+                        else:
+                            line_list.append(line)
+                            line = ''
+                else:
+                    line_list = [text]
+                for line in line_list:
+                    args = {**curr, 'text': line,
+                            'font': font, 'canvas': canvas}
+                    text_bbox.extend(put_text(**args))
+                    curr['y'] += line_height
 
         elif component['type'] == 'table':
             # get number of column
-            col_num = None
             col_ratio = []
             # get config
             for c_comp in component['children']:
                 if c_comp['type'] == 'table_head':
                     # count number of columns
-                    col_num = len(c_comp['children'])
                     for cell in c_comp['children']:
                         col_ratio.append(float(cell['children'][0]['text']))
                     assert 1 == sum(col_ratio), 'the ratio should add up to 1'
@@ -206,9 +230,11 @@ def generate():
                     curr['y'] += line_height
         else:
             print(component)
+
     for tbox in text_bbox:
         tbox['bbox_label'] = 0
         tbox['ignore'] = False
+
     return paper, text_bbox
 
 
@@ -217,6 +243,7 @@ if __name__ == '__main__':
     parser.add_argument('--sample_number', default=10, type=int)
     parser.add_argument('--copy', default=3, type=int)
     parser.add_argument('--output_dir', default='output')
+    parser.add_argument('--split_train_test', action='store_true', default='output')
 
     args = parser.parse_args()
 
@@ -245,7 +272,7 @@ if __name__ == '__main__':
             cv2.imwrite(os.path.join(args.output_dir, img_path), aug_img)
 
             m = metadata.copy()
-            m['image_path'] = img_name
+            m['img_path'] = img_name
             image_bbox_list.append(m)
             img_counter += 1
 
@@ -253,11 +280,15 @@ if __name__ == '__main__':
     metainfo = dict(dataset_type='TextDetDataset',
                     task_name='textdet', category=dict(id=0, name='text'))
 
-    with open(os.path.join(args.output_dir, 'textdet_train.json',), 'w') as fp:
+    if args.split_train_test:
+        with open(os.path.join(args.output_dir, 'textdet_train.json',), 'w') as fp:
+            json.dump(dict(metainfo=metainfo, data_list=image_bbox_list[:train_size]),
+                    fp, ensure_ascii=False,)
 
-        json.dump(dict(metainfo=metainfo, data_list=image_bbox_list[:train_size]),
-                  fp, ensure_ascii=False,)
-
-    with open(os.path.join(args.output_dir, 'textdet_test.json',), 'w') as fp:
-        json.dump(dict(metainfo=metainfo, data_list=image_bbox_list[train_size:]),
-                  fp, ensure_ascii=False,)
+        with open(os.path.join(args.output_dir, 'textdet_test.json',), 'w') as fp:
+            json.dump(dict(metainfo=metainfo, data_list=image_bbox_list[train_size:]),
+                    fp, ensure_ascii=False,)
+    else:
+        with open(os.path.join(args.output_dir, 'textdet_train.json',), 'w') as fp:
+            json.dump(dict(metainfo=metainfo, data_list=image_bbox_list),
+                    fp, ensure_ascii=False,)
