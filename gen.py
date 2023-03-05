@@ -241,9 +241,10 @@ def generate():
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--sample_number', default=10, type=int)
-    parser.add_argument('--copy', default=3, type=int)
+    parser.add_argument('--copy', default=1, type=int)
     parser.add_argument('--output_dir', default='output')
-    parser.add_argument('--split_train_test', action='store_true', default='output')
+    parser.add_argument('--split_train_test', action='store_true')
+    parser.add_argument('--train_size', type=float, default=0.8)
 
     args = parser.parse_args()
 
@@ -276,7 +277,7 @@ if __name__ == '__main__':
             image_bbox_list.append(m)
             img_counter += 1
 
-    train_size = int(len(image_bbox_list) * .8)
+    train_size = int(len(image_bbox_list) * args.train_size)
     metainfo = dict(dataset_type='TextDetDataset',
                     task_name='textdet', category=dict(id=0, name='text'))
 
