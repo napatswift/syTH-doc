@@ -35,10 +35,9 @@ def check_size(bbox):
 def save_image(filename: str, bbox: BoundingBox, img: np.array):
     assert isinstance(bbox, BoundingBox)
     assert isinstance(img, np.ndarray)
-    r = 250/bbox.width
-    w = bbox.width * r
-    h = bbox.height * r
-    print(r)
+    # r = 250/bbox.width
+    w = bbox.width  # * r
+    h = bbox.height # * r
     text_img = img[bbox.y1_int:bbox.y2_int, bbox.x1_int:bbox.x2_int, :]
     return cv2.imwrite(filename,
                        cv2.resize(text_img, (int(w), int(h))))
@@ -66,7 +65,7 @@ def cvt(dir_name, data_list, matadata_fpath):
           IMG_ID += 1
         except:
            pass
-        assert IMG_ID < 100
+        # assert IMG_ID < 100
 
     fp_metadata = open(matadata_fpath, 'a')
     img_dir = os.path.join(f'{dir_name}_recog', 'imgs',)
@@ -79,7 +78,7 @@ def cvt(dir_name, data_list, matadata_fpath):
     fp_metadata.close()
 
 if __name__ == '__main__':
-    dir_name = 'output/thvl'
+    dir_name = 'output/thvl2'
     data = json.load(open(os.path.join(dir_name, 'textdet_train.json')))
     img_dir = os.path.join(f'{dir_name}_recog', 'imgs',)
     matadata_fpath = os.path.join(img_dir, 'metadata.csv')
@@ -87,7 +86,7 @@ if __name__ == '__main__':
     with open(matadata_fpath, 'w') as fp:
         fp.write('file_name,text\n')
     shuffle(data['data_list'])
-    cvt(dir_name, data['data_list'][:10], matadata_fpath)
+    cvt(dir_name, data['data_list'], matadata_fpath)
 
             
 

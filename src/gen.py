@@ -1,9 +1,6 @@
 from PIL import Image, ImageFont, ImageDraw
 import mistune
 import re
-import random
-import pandas as pd
-from faker import Faker
 import os
 import argparse
 import json
@@ -11,107 +8,40 @@ import augraphy as ag
 import numpy as np
 import cv2
 import attacut
+from text import *
+from paper import *
+from font import get_font
 
-aug_pipeline = ag.AugmentationSequence([
-    ag.LowInkRandomLines(),
-    ag.PencilScribbles(size_range=(10, 50),
-                       stroke_count_range=(1, 3),
-                       count_range=(1, 3),
-                       thickness_range=(1, 2),
-                       p=.5),
-    ag.Gamma(gamma_range=(.1, .3)),
-    ag.LowInkPeriodicLines(),
-])
+def get_augmenter():
+    return ag.AugmentationSequence([
+        ag.LowInkRandomLines(),
+        ag.PencilScribbles(size_range=(10, 50),
+                        stroke_count_range=(1, 3),
+                        count_range=(1, 3),
+                        thickness_range=(1, 2),
+                        p=.5),
+        ag.Gamma(gamma_range=(.1, .3)),
+        ag.LowInkPeriodicLines(),
+    ])
 
+def put_text(canvas: ImageDraw,x: float, y: float, text: str, font: ImageFont):
+    """
+    Write text on a PIL ImageDraw object at the specified coordinates and return the bounding box of each word.
 
-def arabic2th(n):
-    return chr(ord(n)+(ord('๑')-ord('1')))
+    Args:
+        canvas (ImageDraw): The ImageDraw object to write the text on.
+        x (float): The x-coordinate to start writing the text.
+        y (float): The y-coordinate to start writing the text.
+        text (str): The text to write.
+        font (ImageFont): The font to use for writing the text.
 
+    Returns:
+        list: A list of dictionaries, where each dictionary contains the bounding box and polygon of a word, as well as the text of the word.
 
-class DocTemplate:
-    def __init__(self,):
-        template_fpath = [os.path.join('templates', fname)
-                          for fname in os.listdir('templates/')
-                          if fname.endswith('.md')]
-        self.templates = [open(fp).read() for fp in template_fpath]
-        self.next = 0
+    Raises:
+        TypeError: If the `canvas` argument is not an instance of `PIL.ImageDraw.ImageDraw`, or if the `font` argument is not an instance of `PIL.ImageFont.ImageFont`.
+    """
 
-    def gen(self):
-        template = self.templates[self.next]
-        self.next = (self.next + 1) % len(self.templates)
-        return template
-
-
-politician = pd.read_csv('data/TWFU-PoliticianData.csv', skiprows=1)
-doc_template_gen = DocTemplate()
-faker = Faker('th')
-
-
-def get_token_text(token: str):
-    assert token[0] == '{' and token[-1] == '}'
-    token = token[1:-1]
-    if token == 'number':
-        if random.random() > 0.5:
-            return str(random.randint(0, 50))
-        return str(random.randint(0, 1000))
-    if token == 'number_th':
-        num = str(random.randint(0, 50))
-        return ''.join([arabic2th(n) for n in num])
-    if token == 'pm_id':
-        return '%03d' % random.randint(0, 1000)
-    if token == 'pm_name_lastname':
-        if random.random() > 0.5:
-            sample = politician.sample(3)
-            title = sample.iloc[0]['title']
-            name = sample.iloc[1]['name']
-            lastname = sample.iloc[2]['lastname']
-        else:
-            title = random.choice(['นาย', 'นาง', 'นางสาว', 'พลตำรวจ'])
-            name = faker.first_name()
-            lastname = faker.last_name()
-        return f'{title}{name} {lastname}'
-    if token == 'party':
-        text = politician[~politician.party.isna()].party.sample().iloc[0]
-        return text
-    if token == 'vote':
-        return random.choice(['เห็นด้วย', 'ไม่เห็นด้วย', 'เห็นไม่ด้วย', '-'])
-    if token == 'phonenumber_th':
-        return ''.join([arabic2th(n) if n.isdigit() else n for n in faker.phone_number()])
-    if token == 'month':
-        return faker.month_name()
-    if re.match(r'paragraph_\d+', token):
-        n = re.findall(r'paragraph_(\d+)', token)[0]
-        n = int(n)
-        return faker.paragraph(n)
-    if re.match(r'words_\d+', token):
-        n = re.findall(r'words_(\d+)', token)[0]
-        n = int(n)
-        return ''.join(faker.words(n))
-    return 'dummy'
-
-
-def get_doc_md(template):
-    """return markdown text"""
-    tokens = re.findall('\{[^\}]*\}', template)
-    for token in tokens:
-        template = template.replace(token, get_token_text(token), 1)
-    return template
-
-
-def get_font():
-    fpaths = random.choice(['fonts/THSarabun.ttf', 'fonts/THSarabun Bold.ttf'])
-    return ImageFont.truetype(fpaths, size=random.randrange(26, 28))
-
-
-def create_paper(
-    width=1156,
-    height=1636,
-    color='#fff'
-):
-    return Image.new('RGB', (width, height,), color)
-
-
-def put_text(canvas, x, y, text, font):
     words = text.split()
     curr_x = x
     word_bbox = []
@@ -129,41 +59,84 @@ def put_text(canvas, x, y, text, font):
 
     return word_bbox
 
+def split_text_into_lines(word_list, font, max_x):
+    """
+    Splits a list of words into lines based on a maximum width constraint
+    
+    Args:
+        word_list (List[str]): The list of words to split into lines
+        font (ImageFont): The font used to measure the width of each word
+        max_x (float): The maximum line width
+        
+    Returns:
+        List[str]: A list of strings, where each string represents a 
+                   line of text that fits within the maximum width
+    """
+    
+    lines = []  # list to hold the lines of text
+    line = ''   # variable to hold the current line being built
+    
+    # loop over each word in the list of words
+    for word in word_list:
+        # if adding the word to the current line would keep it within the maximum width,
+        # add the word to the line
+        if font.getlength(line + word) < max_x:
+            line += word
+        # otherwise, add the current line to the list of lines and start a new line with the word
+        else:
+            lines.append(line)
+            line = word
+    
+    # add the final line to the list of lines (if it exists)
+    if line:
+        lines.append(line)
+    
+    return lines
 
-def generate():
-    markdown_parser = mistune.create_markdown(
-        plugins=['table'], renderer='ast')
+def render_config(component):
+    assert isinstance(component, dict)
+    assert component['type'] == 'doc_config'
+
+    config = dict()
+    for k, v in component['children'].items():
+        config[k] = parse_string(v)
+
+    return config
+
+def generate(parsed_components):
     paper = create_paper()
     canvas = ImageDraw.Draw(paper)
     font = get_font()
-    parsed_components = markdown_parser(get_doc_md(doc_template_gen.gen()))
-    line_height = font.size + 6
-    position_start = {'x': 120, 'y': 150, }
-    paper_config = {'max_x': paper.size[0] - 120}
+    # parsed_components = markdown_parser(get_doc_md(doc_template_gen.gen()))
+    position_start = {'x': 120, 'y': 150,}
+    paper_config = {'max_x': paper.size[0] - 120, 'lineHeight': font.size + 6}
     curr = position_start.copy()
 
     text_bbox = []
-    for component in parsed_components:
+    for (i,component) in enumerate(parsed_components):
         if component['type'] == 'paragraph':
             for c_comp in component['children']:
+                if c_comp['type'] == 'doc_config':
+                    paper_config.update(render_config(c_comp))
+                    if i == 0:
+                        paper = create_paper(width=paper_config.get('paperWidth'),
+                                             height=paper_config.get('paperHeight'),
+                                             color=paper_config.get('paperColor'))
+                        canvas = ImageDraw.Draw(paper)
+                    continue
+
                 text = c_comp['text']
                 if curr['x'] + font.getlength(text) > paper_config['max_x']:
                     word_list = attacut.tokenize(text)
-                    line_list = []
-                    line = ''
-                    for word in word_list:
-                        if curr['x'] + font.getlength(line+word) < paper_config['max_x']:
-                            line += word
-                        else:
-                            line_list.append(line)
-                            line = ''
+                    line_list = split_text_into_lines(word_list, font, paper_config['max_x'] - curr['x'])
                 else:
                     line_list = [text]
+
                 for line in line_list:
                     args = {**curr, 'text': line,
                             'font': font, 'canvas': canvas}
                     text_bbox.extend(put_text(**args))
-                    curr['y'] += line_height
+                    curr['y'] += paper_config['lineHeight']
 
         elif component['type'] == 'table':
             # get number of column
@@ -171,14 +144,13 @@ def generate():
             # get config
             for c_comp in component['children']:
                 if c_comp['type'] == 'table_head':
-                    # count number of columns
                     for cell in c_comp['children']:
                         col_ratio.append(float(cell['children'][0]['text']))
                     assert 1 == sum(col_ratio), 'the ratio should add up to 1'
             ####################
 
             table_start = position_start['x']
-            table_size = paper.size[0] - table_start*2
+            table_size = paper.size[0] - table_start * 2
 
             column_widths = [cr*table_size for cr in col_ratio]
 
@@ -209,40 +181,69 @@ def generate():
                         elif cell['align'] == 'center':
                             text_w = font.getlength(text)
                             x = x + cell_width/2 - text_w/2
+                        else:
+                            x = x + 5
+                        
+                        # center_y
+                        t_x0, t_y0, t_x1, t_y1 = font.getbbox(text)
+                        center_y = curr['y'] + paper_config['lineHeight']/2 - t_y1/2
                         ####################
 
                         args = {
                             'x': x,
-                            'y': curr['y'],
+                            'y': center_y,
                             'text': text,
                             'font': font,
                             'canvas': canvas
                         }
+
                         text_bbox.extend(put_text(**args))
 
-                    curr['y'] += line_height
+                    y0 = curr['y']
+                    for i in range(len(row['children'])):
+                        x0 = table_start + sum(column_widths[:i])
+                        x1 = x0 + column_widths[i]
+                        if paper_config.get('tableOutline', False):
+                            canvas.rectangle((x0, y0, x1, y0 + paper_config['lineHeight']),
+                                             None,
+                                             'black',
+                                             paper_config.get('tableOutlineWidth', 1))
+                    curr['y'] += paper_config['lineHeight']
 
         elif component['type'] == 'block_html':
             tags = re.findall(r'<([^>/]+)/?>', component['text'])
             for tag in tags:
                 # if the tag is <br> or <br/> then add line
                 if tag == 'br':
-                    curr['y'] += line_height
+                    curr['y'] += paper_config['lineHeight']
         else:
             print(component)
-
     for tbox in text_bbox:
         tbox['bbox_label'] = 0
         tbox['ignore'] = False
-
     return paper, text_bbox
+
+def plugin_doc_config(md):
+    def parse(block, m, state):
+        configs = m.group(1)
+        configs = dict(re.findall('([^=]+)=([^,]+),?', configs))
+        return 'doc_config', configs
+    
+    def after_parse(md, tokens, state):
+        return tokens
+    
+    CONFIG = r'\\c:([^ \n]+)'
+    
+    md.inline.register_rule('doc_config', CONFIG, parse)
+    # md.before_render_hooks.append(after_parse)
+    md.inline.rules.append('doc_config')
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--sample_number', default=10, type=int)
     parser.add_argument('--copy', default=1, type=int)
-    parser.add_argument('--output_dir', default='output')
+    parser.add_argument('--output_dir', default='output/thvl')
     parser.add_argument('--split_train_test', action='store_true')
     parser.add_argument('--train_size', type=float, default=0.8)
 
@@ -252,12 +253,16 @@ if __name__ == '__main__':
 
     os.makedirs(os.path.join(args.output_dir, img_dir), exist_ok=True)
 
+    markdown_parser = mistune.create_markdown(
+        plugins=['table', plugin_doc_config], renderer='ast')
+    doc_template_gen = DocTemplate()
+
     img_counter = 0
 
     image_bbox_list = []
 
     for i in range(args.sample_number):
-        img, bboxes = generate()
+        img, bboxes = generate(markdown_parser(get_doc_md(doc_template_gen.gen())))
 
         metadata = dict(
             instances=bboxes,
@@ -268,7 +273,7 @@ if __name__ == '__main__':
         for j in range(args.copy):
             img_name = f'img_{img_counter}.jpg'
             img_path = os.path.join(img_dir, img_name)
-            aug_img = aug_pipeline(np.array(img))[0]
+            aug_img = get_augmenter()(np.array(img))[0]
 
             cv2.imwrite(os.path.join(args.output_dir, img_path), aug_img)
 

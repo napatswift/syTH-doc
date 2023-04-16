@@ -23,3 +23,8 @@ tar -zcvf thvl.tar.gz thvl/*
 ```
 
 This will create a compressed archive file that you can use for storage or distribution.
+
+```
+\c:tableOutline=True,tableOutlineWidth=1,lineHeight=50
+\c:paperWidth=1000,paperHeight=1000
+```
