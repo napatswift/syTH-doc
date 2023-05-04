@@ -14,7 +14,7 @@ from font import get_font
 
 def get_augmenter():
     return ag.AugmentationSequence([
-        ag.LowInkRandomLines(),
+        ag.LowInkRandomLines(count_range=(10,15), noise_probability=0.5),
         ag.PencilScribbles(size_range=(10, 50),
                         stroke_count_range=(1, 3),
                         count_range=(1, 3),
@@ -22,6 +22,7 @@ def get_augmenter():
                         p=.5),
         ag.Gamma(gamma_range=(.1, .3)),
         ag.LowInkPeriodicLines(),
+        ag.LightingGradient(p=0.8),
     ])
 
 def put_text(canvas: ImageDraw,x: float, y: float, text: str, font: ImageFont):
@@ -107,7 +108,6 @@ def generate(parsed_components):
     paper = create_paper()
     canvas = ImageDraw.Draw(paper)
     font = get_font()
-    # parsed_components = markdown_parser(get_doc_md(doc_template_gen.gen()))
     position_start = {'x': 120, 'y': 150,}
     paper_config = {'max_x': paper.size[0] - 120, 'lineHeight': font.size + 6}
     curr = position_start.copy()
@@ -123,6 +123,9 @@ def generate(parsed_components):
                                              height=paper_config.get('paperHeight'),
                                              color=paper_config.get('paperColor'))
                         canvas = ImageDraw.Draw(paper)
+                        position_start = {'x': paper_config.get('marginX', 0), 'y': paper_config.get('marginY', 0)}
+                        paper_config['max_x'] = paper.size[0] - position_start['x']
+                        curr = position_start.copy()
                     continue
 
                 text = c_comp['text']

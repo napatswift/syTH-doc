@@ -4,6 +4,9 @@ import os
 import shutil
 
 def read_dataset(json_path: str):
+    if json_path is None:
+       return None
+    
     with open(json_path, 'r') as fp:  
       data = json.load(fp)
     return data
@@ -24,11 +27,14 @@ def concat_dataset(json_1: str, json_2, dest):
   move_image_file(os.path.dirname(json_1), dest, dl1)
   data_list += dl1
 
-  dl2 = ds2['data_list']
-  print('dataset 2: size of {}'.format(len(dl2)))
-  move_image_file(os.path.dirname(json_2), dest, dl2)
-  data_list += dl2
+  if ds2 is not None:  
+    dl2 = ds2['data_list']
+    print('dataset 2: size of {}'.format(len(dl2)))
+    move_image_file(os.path.dirname(json_2), dest, dl2)
+    data_list += dl2
   
+  print('concat dataset: size of {}'.format(len(data_list)))
+
   return dict(meta_info=metadata, data_list=data_list)
 
 def move_image_file(source, dest, data_list):
@@ -72,13 +78,17 @@ if __name__ == '__main__':
         elif 'test' in f:
            split = 'test'
         if split not in dataset_list.keys():
-           dataset_list[split] = list()
+           dataset_list[split] = []
         split_list = dataset_list.get(split)
         split_list.append(f)
 
     os.makedirs(args.dest,)
 
     for split in dataset_list:
+      print(f'concat {split} dataset')
+      if len(dataset_list[split]) == 1:
+         dataset_list[split].append(None)
+
       concat_ds = concat_dataset(*dataset_list[split], args.dest)
 
       with open(os.path.join(args.dest, f'textdet_{split}.json'), 'w') as fp:
