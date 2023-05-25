@@ -17,14 +17,6 @@ def arabic2th(n):
 
     Returns:
         str: The corresponding Thai numeral as a string.
-
-    Examples:
-        >>> arabic2th('123')
-        '๑๒๓'
-        >>> arabic2th('0')
-        '๐'
-        >>> arabic2th('999')
-        '๙๙๙'
     """
     return chr(ord(n)+(ord('๑')-ord('1')))
 

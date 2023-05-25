@@ -1,4 +1,4 @@
-\c:paperWidth=1000,paperHeight=670,marginX=10,marginY=10
+\c:paperWidth=1000,paperHeight=970,marginX=10,marginY=10
 
 \c:tableOutline=True,tableOutlineWidth=1,lineHeight=50
 
@@ -10,10 +10,16 @@
 |{number_th}|{pm_id}|{words_3} {words_1}|{words_1}|{words_2}|
 |{number_th}|{pm_id}|{words_3} {words_1}|{words_2}|{words_2}|
 |{number_th}|{pm_id}|{words_3} {words_1}|{words_2}|{words_2}|
+|{number_th}|{pm_id}|{words_1} {words_2} {words_1}|{words_1}|{words_2}|
 |{number_th}|{pm_id}|{words_3} {words_1}|{words_2}|{words_2}|
 |{number_th}|{pm_id}|{words_3} {words_1}|{words_2}|{words_2}|
 |{number_th}|{pm_id}|{words_3} {words_1}|{words_2}|{words_2}|
+|{number_th}|{pm_id}|{words_1} {words_2} {words_1}|{words_1}|{words_2}|
+|{number_th}|{pm_id}|{words_1} {words_2} {words_1}|{words_1}|{words_2}|
 |{number_th}|{pm_id}|{words_3} {words_1}|{words_2}|{words_2}|
 |{number_th}|{pm_id}|{words_3} {words_1}|{words_2}|{words_2}|
+|{number_th}|{pm_id}|{words_3} {words_1}|{words_2}|{words_2}|
+|{number_th}|{pm_id}|{words_1} {words_2} {words_1}|{words_1}|{words_2}|
+|{number_th}|{pm_id}|{words_1} {words_2} {words_1}|{words_1}|{words_2}|
 |{number_th}|{pm_id}|{words_3} {words_1}|{words_2}|{words_2}|
 |{number_th}|{pm_id}|{words_1} {words_2} {words_1}|{words_1}|{words_2}|

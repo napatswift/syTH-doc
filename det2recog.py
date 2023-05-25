@@ -6,6 +6,7 @@ from tqdm import tqdm
 import imgaug.augmenters as iaa
 from imgaug.augmentables.bbs import BoundingBox, BoundingBoxesOnImage
 from random import randint, shuffle
+import argparse
 
 IMG_ID  = 0
 AUG_SEQ = iaa.Sequential([
@@ -19,6 +20,7 @@ AUG_SEQ = iaa.Sequential([
 ])
 
 def get_bbox_and_text(rect_text_list):
+    """Get bbox and text from rect_text_list"""
     text_list = []
     bbox_list = []
     for rect_text in rect_text_list:
@@ -78,15 +80,21 @@ def cvt(dir_name, data_list, matadata_fpath):
     fp_metadata.close()
 
 if __name__ == '__main__':
-    dir_name = 'output/thvl2'
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--dir_name', type=str,)
+    args = parser.parse_args()
+    
+    dir_name = args.dir_name
     data = json.load(open(os.path.join(dir_name, 'textdet_train.json')))
     img_dir = os.path.join(f'{dir_name}_recog', 'imgs',)
     matadata_fpath = os.path.join(img_dir, 'metadata.csv')
     os.makedirs(img_dir, exist_ok=True)
+    
     with open(matadata_fpath, 'w') as fp:
         fp.write('file_name,text\n')
     shuffle(data['data_list'])
-    cvt(dir_name, data['data_list'], matadata_fpath)
+    
+    cvt(dir_name, data['data_list'][:1], matadata_fpath)
 
             
 
