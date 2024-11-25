@@ -1,0 +1,7 @@
+pillow==11.0.0
+mistune==3.0.1
+augraphy==8.2.6
+attacut==1.0.6
+tqdm
+faker
+pandas

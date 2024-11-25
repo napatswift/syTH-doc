@@ -15,22 +15,26 @@ from tqdm import trange
 
 import warnings
 
-warnings.filterwarnings('ignore', category=np.RankWarning)
+warnings.filterwarnings("ignore", category=np.RankWarning)
 
 
 def get_augmenter():
-    return ag.AugmentationSequence([
-        ag.LowInkRandomLines(count_range=(10, 15), noise_probability=0.5),
-        ag.PencilScribbles(size_range=(10, 50),
-                           stroke_count_range=(1, 3),
-                           count_range=(1, 3),
-                           thickness_range=(1, 2),
-                           p=.5),
-        ag.Gamma(gamma_range=(.1, .3)),
-        ag.BleedThrough(),
-        ag.LowInkPeriodicLines(),
-        ag.LightingGradient(p=0.8),
-    ])
+    return ag.AugmentationSequence(
+        [
+            ag.LowInkRandomLines(count_range=(10, 15), noise_probability=0.5),
+            # ag.PencilScribbles(
+            #     size_range=(10, 50),
+            #     stroke_count_range=(1, 3),
+            #     count_range=(1, 3),
+            #     thickness_range=(1, 2),
+            #     p=0.5,
+            # ),
+            ag.Gamma(gamma_range=(0.1, 0.3)),
+            ag.BleedThrough(),
+            ag.LowInkPeriodicLines(),
+            ag.LightingGradient(p=0.8),
+        ]
+    )
 
 
 def put_text(canvas: ImageDraw, x: float, y: float, text: str, font: ImageFont):
@@ -56,15 +60,19 @@ def put_text(canvas: ImageDraw, x: float, y: float, text: str, font: ImageFont):
     word_bbox = []
     for i in range(len(words)):
         word = words[i]
-        canvas.text((curr_x, y), word, fill='black', font=font)
+        canvas.text((curr_x, y), word, fill="black", font=font)
 
         x0, y0, x1, y1 = canvas.textbbox((curr_x, y), word, font=font)
-        word_bbox.append(dict(polygon=[x0, y0, x1, y0, x1, y1, x0, y1],
-                              bbox=[x0, y0, x1, y1],
-                              text=word))
+        word_bbox.append(
+            dict(
+                polygon=[x0, y0, x1, y0, x1, y1, x0, y1],
+                bbox=[x0, y0, x1, y1],
+                text=word,
+            )
+        )
         curr_x = x1
-        if i+1 < len(words):
-            curr_x += font.getlength(' ')
+        if i + 1 < len(words):
+            curr_x += font.getlength(" ")
 
     return word_bbox
 
@@ -79,12 +87,12 @@ def split_text_into_lines(word_list, font, max_x):
         max_x (float): The maximum line width
 
     Returns:
-        List[str]: A list of strings, where each string represents a 
+        List[str]: A list of strings, where each string represents a
                    line of text that fits within the maximum width
     """
 
     lines = []  # list to hold the lines of text
-    line = ''   # variable to hold the current line being built
+    line = ""  # variable to hold the current line being built
 
     # loop over each word in the list of words
     for word in word_list:
@@ -106,10 +114,10 @@ def split_text_into_lines(word_list, font, max_x):
 
 def render_config(component):
     assert isinstance(component, dict)
-    assert component['type'] == 'doc_config'
+    assert component["type"] == "doc_config"
 
     config = dict()
-    for k, v in component['children'].items():
+    for k, v in component["children"].items():
         config[k] = parse_string(v)
 
     return config
@@ -119,8 +127,11 @@ def generate(parsed_components):
     paper = create_paper()
     canvas = ImageDraw.Draw(paper)
     font = get_font()
-    position_start = {'x': 120, 'y': 150, }
-    paper_config = {'max_x': paper.size[0] - 120, 'lineHeight': font.size + 6}
+    position_start = {
+        "x": 120,
+        "y": 150,
+    }
+    paper_config = {"max_x": paper.size[0] - 120, "lineHeight": font.size + 6}
     curr = position_start.copy()
 
     def maybe_new_font(font):
@@ -129,65 +140,78 @@ def generate(parsed_components):
         return font
 
     text_bbox = []
-    for (i, component) in enumerate(parsed_components):
-        if component['type'] == 'paragraph':
-            for c_comp in component['children']:
-                if c_comp['type'] == 'doc_config':
+    for i, component in enumerate(parsed_components):
+        if component["type"] == "paragraph":
+            for c_comp in component["children"]:
+                if c_comp["type"] == "doc_config":
+                    print('doc_config',c_comp)
                     paper_config.update(render_config(c_comp))
                     if i == 0:
-                        paper = create_paper(width=paper_config.get('paperWidth'),
-                                             height=paper_config.get(
-                                                 'paperHeight'),
-                                             color=paper_config.get('paperColor'))
+                        paper = create_paper(
+                            width=paper_config.get("paperWidth"),
+                            height=paper_config.get("paperHeight"),
+                            color=paper_config.get("paperColor"),
+                        )
                         canvas = ImageDraw.Draw(paper)
-                        position_start = {'x': paper_config.get(
-                            'marginX', 0), 'y': paper_config.get('marginY', 0)}
-                        paper_config['max_x'] = paper.size[0] - \
-                            position_start['x']
+                        position_start = {
+                            "x": paper_config.get("marginX", 0),
+                            "y": paper_config.get("marginY", 0),
+                        }
+                        paper_config["max_x"] = (
+                            paper.size[0] - position_start["x"]
+                        )
                         curr = position_start.copy()
-                    continue    
-            
+                    continue
+
                 font = maybe_new_font(font)
-                text = c_comp['text']
-                if curr['x'] + font.getlength(text) > paper_config['max_x']:
+                text = c_comp.get("raw")
+                if text is None:
+                    continue
+                if curr["x"] + font.getlength(text) > paper_config["max_x"]:
                     word_list = attacut.tokenize(text)
                     line_list = split_text_into_lines(
-                        word_list, font, paper_config['max_x'] - curr['x'])
+                        word_list, font, paper_config["max_x"] - curr["x"]
+                    )
                 else:
                     line_list = [text]
 
                 for line in line_list:
-                    args = {**curr, 'text': line,
-                            'font': font, 'canvas': canvas}
+                    args = {
+                        **curr,
+                        "text": line,
+                        "font": font,
+                        "canvas": canvas,
+                    }
                     text_bbox.extend(put_text(**args))
-                    curr['y'] += paper_config['lineHeight']
+                    curr["y"] += paper_config["lineHeight"]
 
-        elif component['type'] == 'table':
+        elif component["type"] == "table":
             # get number of column
             col_ratio = []
             # get config
-            for c_comp in component['children']:
-                if c_comp['type'] == 'table_head':
-                    for cell in c_comp['children']:
-                        col_ratio.append(float(cell['children'][0]['text']))
-                    assert 1 == sum(col_ratio), 'the ratio should add up to 1'
+            for c_comp in component["children"]:
+                if c_comp["type"] == "table_head":
+                    for cell in c_comp["children"]:
+                        print(cell)
+                        col_ratio.append(float(cell["children"][0]["raw"]))
+                    assert 1 == sum(col_ratio), "the ratio should add up to 1"
             ####################
 
-            table_start = paper_config.get('marginX', position_start['x'])
+            table_start = paper_config.get("marginX", position_start["x"])
             table_size = paper.size[0] - table_start * 2
 
-            column_widths = [cr*table_size for cr in col_ratio]
+            column_widths = [cr * table_size for cr in col_ratio]
 
-            for c_comp in component['children']:
-                for row in c_comp['children']:
+            for c_comp in component["children"]:
+                for row in c_comp["children"]:
                     # skip header
-                    if c_comp['type'] == 'table_head':
+                    if c_comp["type"] == "table_head":
                         continue
 
-                    for i, cell in enumerate(row['children']):
+                    for i, cell in enumerate(row["children"]):
                         font = maybe_new_font(font)
 
-                        if len(cell['children']) == 0:
+                        if len(cell["children"]) == 0:
                             continue
 
                         # position
@@ -195,94 +219,110 @@ def generate(parsed_components):
                         if i != 0:
                             cell_x_start += 5
                         cell_width = column_widths[i]
-                        x = table_start+cell_x_start
+                        x = table_start + cell_x_start
                         ####################
 
-                        text = cell['children'][0]['text']
+                        text = cell["children"][0]["raw"]
 
                         # alignment of text
-                        if cell['align'] == 'right':
+                        print(cell)
+                        cell_attrs = cell.get("attrs", {})
+                        if cell_attrs["align"] == "right":
                             text_w = font.getlength(text)
                             x = x + cell_width - text_w
-                        elif cell['align'] == 'center':
+                        elif cell_attrs["align"] == "center":
                             text_w = font.getlength(text)
-                            x = x + cell_width/2 - text_w/2
+                            x = x + cell_width / 2 - text_w / 2
                         else:
                             x = x + 5
 
                         # center_y
                         t_x0, t_y0, t_x1, t_y1 = font.getbbox(text)
-                        center_y = curr['y'] + \
-                            paper_config['lineHeight']/2 - t_y1/2
+                        center_y = (
+                            curr["y"]
+                            + paper_config["lineHeight"] / 2
+                            - t_y1 / 2
+                        )
                         ####################
 
                         args = {
-                            'x': x,
-                            'y': center_y,
-                            'text': text,
-                            'font': font,
-                            'canvas': canvas
+                            "x": x,
+                            "y": center_y,
+                            "text": text,
+                            "font": font,
+                            "canvas": canvas,
                         }
 
                         text_bbox.extend(put_text(**args))
 
-                    y0 = curr['y']
-                    for i in range(len(row['children'])):
+                    y0 = curr["y"]
+                    for i in range(len(row["children"])):
                         x0 = table_start + sum(column_widths[:i])
                         x1 = x0 + column_widths[i]
-                        if paper_config.get('tableOutline', False):
-                            canvas.rectangle((x0, y0, x1, y0 + paper_config['lineHeight']),
-                                             None,
-                                             'black',
-                                             paper_config.get('tableOutlineWidth', 1))
-                    curr['y'] += paper_config['lineHeight']
+                        if paper_config.get("tableOutline", False):
+                            canvas.rectangle(
+                                (x0, y0, x1, y0 + paper_config["lineHeight"]),
+                                None,
+                                "black",
+                                paper_config.get("tableOutlineWidth", 1),
+                            )
+                    curr["y"] += paper_config["lineHeight"]
 
-        elif component['type'] == 'block_html':
-            tags = re.findall(r'<([^>/]+)/?>', component['text'])
+        elif component["type"] == "block_html":
+            tags = re.findall(
+                r"<([^>/]+)/?>",
+                component.get("text", False) or component.get("raw", False),
+            )
             for tag in tags:
                 # if the tag is <br> or <br/> then add line
-                if tag == 'br':
-                    curr['y'] += paper_config['lineHeight']
+                if tag == "br":
+                    curr["y"] += paper_config["lineHeight"]
         else:
             print(component)
     for tbox in text_bbox:
-        tbox['bbox_label'] = 0
-        tbox['ignore'] = False
+        tbox["bbox_label"] = 0
+        tbox["ignore"] = False
     return paper, text_bbox
 
 
-def plugin_doc_config(md):
-    def parse(block, m, state):
-        configs = m.group(1)
-        configs = dict(re.findall('([^=]+)=([^,]+),?', configs))
-        return 'doc_config', configs
+def plugin_doc_config(md: mistune.Markdown):
+    def parse(block: mistune.inline_parser.InlineParser, m: re.Match, state):
+        configs = m.groups()[-1]
+        configs = dict(re.findall("([^=]+)=([^,]+),?", configs))
+        state.append_token({"type": "doc_config", "children": configs})
+        return m.end() + 1
 
     def after_parse(md, tokens, state):
         return tokens
 
-    CONFIG = r'\\c:([^ \n]+)'
+    CONFIG_PATTERN = r"\\c:([^\s]+)"
 
-    md.inline.register_rule('doc_config', CONFIG, parse)
+    md.inline.register("doc_config", CONFIG_PATTERN, parse)
     # md.before_render_hooks.append(after_parse)
-    md.inline.rules.append('doc_config')
+    # md.inline.rules.append("doc_config")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--sample_number', default=10, type=int)
-    parser.add_argument('--copy', default=1, type=int)
-    parser.add_argument('--output_dir', default='output/thvl')
-    parser.add_argument('--split_train_test', action='store_true')
-    parser.add_argument('--train_size', type=float, default=0.8)
+    parser.add_argument("--sample_number", default=10, type=int)
+    parser.add_argument("--copy", default=1, type=int)
+    parser.add_argument("--output_dir", default="output/thvl")
+    parser.add_argument("--split_train_test", action="store_true")
+    parser.add_argument("--train_size", type=float, default=0.8)
 
     args = parser.parse_args()
 
-    img_dir = 'imgs'
+    img_dir = "imgs"
 
     os.makedirs(os.path.join(args.output_dir, img_dir), exist_ok=True)
 
     markdown_parser = mistune.create_markdown(
-        plugins=['table', plugin_doc_config], renderer='ast')
+        plugins=[
+            "table",
+            plugin_doc_config,
+        ],
+        renderer="ast",
+    )
     doc_template_gen = DocTemplate()
 
     img_counter = 0
@@ -290,42 +330,71 @@ if __name__ == '__main__':
     image_bbox_list = []
     try:
         for i in trange(args.sample_number):
-            img, bboxes = generate(markdown_parser(
-                get_doc_md(doc_template_gen.gen())))
+            img, bboxes = generate(
+                markdown_parser(get_doc_md(doc_template_gen.gen()))
+            )
 
             metadata = dict(
-                instances=bboxes,
-                width=img.size[0],
-                height=img.size[1]
+                instances=bboxes, width=img.size[0], height=img.size[1]
             )
 
             for j in range(args.copy):
-                img_name = f'img_{img_counter}.jpg'
+                img_name = f"img_{img_counter}.jpg"
                 img_path = os.path.join(img_dir, img_name)
                 aug_img = get_augmenter()(np.array(img))[0]
 
                 cv2.imwrite(os.path.join(args.output_dir, img_path), aug_img)
 
                 m = metadata.copy()
-                m['img_path'] = img_name
+                m["img_path"] = img_name
                 image_bbox_list.append(m)
                 img_counter += 1
     except KeyboardInterrupt:
         pass
 
     train_size = int(len(image_bbox_list) * args.train_size)
-    metainfo = dict(dataset_type='TextDetDataset',
-                    task_name='textdet', category=dict(id=0, name='text'))
+    metainfo = dict(
+        dataset_type="TextDetDataset",
+        task_name="textdet",
+        category=dict(id=0, name="text"),
+    )
 
     if args.split_train_test:
-        with open(os.path.join(args.output_dir, 'textdet_train.json',), 'w') as fp:
-            json.dump(dict(metainfo=metainfo, data_list=image_bbox_list[:train_size]),
-                      fp, ensure_ascii=False,)
+        with open(
+            os.path.join(
+                args.output_dir,
+                "textdet_train.json",
+            ),
+            "w",
+        ) as fp:
+            json.dump(
+                dict(metainfo=metainfo, data_list=image_bbox_list[:train_size]),
+                fp,
+                ensure_ascii=False,
+            )
 
-        with open(os.path.join(args.output_dir, 'textdet_test.json',), 'w') as fp:
-            json.dump(dict(metainfo=metainfo, data_list=image_bbox_list[train_size:]),
-                      fp, ensure_ascii=False,)
+        with open(
+            os.path.join(
+                args.output_dir,
+                "textdet_test.json",
+            ),
+            "w",
+        ) as fp:
+            json.dump(
+                dict(metainfo=metainfo, data_list=image_bbox_list[train_size:]),
+                fp,
+                ensure_ascii=False,
+            )
     else:
-        with open(os.path.join(args.output_dir, 'textdet_train.json',), 'w') as fp:
-            json.dump(dict(metainfo=metainfo, data_list=image_bbox_list),
-                      fp, ensure_ascii=False,)
+        with open(
+            os.path.join(
+                args.output_dir,
+                "textdet_train.json",
+            ),
+            "w",
+        ) as fp:
+            json.dump(
+                dict(metainfo=metainfo, data_list=image_bbox_list),
+                fp,
+                ensure_ascii=False,
+            )
