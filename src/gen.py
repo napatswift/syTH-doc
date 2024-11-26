@@ -1,4 +1,4 @@
-from PIL import Image, ImageFont, ImageDraw
+from PIL import ImageFont, ImageDraw
 import mistune
 import re
 import os
@@ -8,10 +8,11 @@ import augraphy as ag
 import numpy as np
 import cv2
 import attacut
-from text import *
-from paper import *
+from text import get_doc_md, parse_string, DocTemplate
+from paper import create_paper
 from font import get_font
 from tqdm import trange
+import random
 
 import warnings
 
@@ -39,7 +40,8 @@ def get_augmenter():
 
 def put_text(canvas: ImageDraw, x: float, y: float, text: str, font: ImageFont):
     """
-    Write text on a PIL ImageDraw object at the specified coordinates and return the bounding box of each word.
+    Write text on a PIL ImageDraw object at the specified coordinates and
+    return the bounding box of each word.
 
     Args:
         canvas (ImageDraw): The ImageDraw object to write the text on.
@@ -49,10 +51,13 @@ def put_text(canvas: ImageDraw, x: float, y: float, text: str, font: ImageFont):
         font (ImageFont): The font to use for writing the text.
 
     Returns:
-        list: A list of dictionaries, where each dictionary contains the bounding box and polygon of a word, as well as the text of the word.
+        list: A list of dictionaries, where each dictionary contains the
+            bounding box and polygon of a word, as well as the text of the word.
 
     Raises:
-        TypeError: If the `canvas` argument is not an instance of `PIL.ImageDraw.ImageDraw`, or if the `font` argument is not an instance of `PIL.ImageFont.ImageFont`.
+        TypeError: If the `canvas` argument is not an instance of
+            `PIL.ImageDraw.ImageDraw`, or if the `font` argument
+            is not an instance of `PIL.ImageFont.ImageFont`.
     """
 
     words = text.split()
@@ -96,11 +101,13 @@ def split_text_into_lines(word_list, font, max_x):
 
     # loop over each word in the list of words
     for word in word_list:
-        # if adding the word to the current line would keep it within the maximum width,
+        # if adding the word to the current line
+        # would keep it within the maximum width,
         # add the word to the line
         if font.getlength(line + word) < max_x:
             line += word
-        # otherwise, add the current line to the list of lines and start a new line with the word
+        # otherwise, add the current line to the list of lines
+        # and start a new line with the word
         else:
             lines.append(line)
             line = word
@@ -144,7 +151,6 @@ def generate(parsed_components):
         if component["type"] == "paragraph":
             for c_comp in component["children"]:
                 if c_comp["type"] == "doc_config":
-                    print('doc_config',c_comp)
                     paper_config.update(render_config(c_comp))
                     if i == 0:
                         paper = create_paper(
@@ -192,7 +198,6 @@ def generate(parsed_components):
             for c_comp in component["children"]:
                 if c_comp["type"] == "table_head":
                     for cell in c_comp["children"]:
-                        print(cell)
                         col_ratio.append(float(cell["children"][0]["raw"]))
                     assert 1 == sum(col_ratio), "the ratio should add up to 1"
             ####################
@@ -225,7 +230,6 @@ def generate(parsed_components):
                         text = cell["children"][0]["raw"]
 
                         # alignment of text
-                        print(cell)
                         cell_attrs = cell.get("attrs", {})
                         if cell_attrs["align"] == "right":
                             text_w = font.getlength(text)
@@ -331,7 +335,9 @@ if __name__ == "__main__":
     try:
         for i in trange(args.sample_number):
             img, bboxes = generate(
-                markdown_parser(get_doc_md(doc_template_gen.gen()))
+                markdown_parser(
+                    get_doc_md(doc_template_gen.gen())
+                )
             )
 
             metadata = dict(
